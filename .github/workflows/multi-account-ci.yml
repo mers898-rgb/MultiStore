@@ -2,14 +2,6 @@
 name: Multi-Account CI
 
 # Compile-verification CI for the multi-account signing fork.
-#
-# This project can only be built on macOS (Xcode), so this workflow is the
-# authoritative way to verify that the app compiles and that the test targets
-# still build/run. It mirrors the proven build steps from pr.yml and runs on
-# pushes to develop/main, on pull requests, and on manual dispatch.
-#
-# The archive build uses CODE_SIGNING_ALLOWED=NO (see the Makefile), so no
-# signing secrets are required.
 
 on:
   push:
@@ -70,6 +62,9 @@ jobs:
             ~/Library/Caches/org.swift.swiftpm
           key: ma-xcode-build-cache-${{ github.ref_name }}-
 
+      - name: Refresh prebuilt dependencies
+        run: bash ./SideStore/fetch-prebuilt.sh force
+
       - name: Build
         run: |
           mkdir -p build/logs
@@ -78,13 +73,7 @@ jobs:
 
       - name: Package IPA
         run: |
-          # fakesign + package into an (unsigned) .ipa that can be sideloaded with your own Apple ID.
           make fakesign | tee -a build/logs/build.log
-          # Strip embedded app extensions (the AltWidget appex) before packaging. When sideloading
-          # with a FREE Apple ID, every embedded extension needs its own App ID + provisioning
-          # profile; that frequently fails with "The app extension is missing a valid provisioning
-          # profile." and also burns the free 10-App-IDs-per-week limit. The app and the
-          # multi-account feature work fine without the home-screen widget.
           rm -rf "SideStore.xcarchive/Products/Applications/SideStore.app/PlugIns"
           make ipa | tee -a build/logs/build.log
 
@@ -113,13 +102,6 @@ jobs:
   unit-tests:
     name: Unit tests (DataStructures plan)
     runs-on: macos-26-intel
-    # NOTE: build-for-testing currently fails on this project — including on the
-    # unmodified upstream baseline — with "Multiple commands produce .../libem_proxy_static.a"
-    # (the app host and the test bundle both build the em_proxy SwiftPM static library
-    # into the same path). This is a pre-existing build-graph issue unrelated to the
-    # multi-account feature, so this job is allowed to fail without failing the workflow.
-    # The "Build (archive, no signing)" job above is the authoritative compile signal
-    # for the multi-account changes.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
