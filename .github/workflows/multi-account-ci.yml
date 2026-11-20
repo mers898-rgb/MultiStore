@@ -1,8 +1,6 @@
 
 name: Multi-Account CI
 
-# Compile-verification CI for the multi-account signing fork.
-
 on:
   push:
     branches:
@@ -13,6 +11,7 @@ on:
       - 'LICENSE'
       - '.editorconfig'
       - '.gitignore'
+
   pull_request:
     branches:
       - develop
@@ -21,6 +20,7 @@ on:
       - 'LICENSE'
       - '.editorconfig'
       - '.gitignore'
+
   workflow_dispatch:
 
 concurrency:
@@ -31,13 +31,16 @@ jobs:
   build:
     name: Build (archive, no signing)
     runs-on: macos-26-intel
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 1
 
-      - run: brew install ldid xcbeautify
+      - name: Install dependencies
+        run: brew install ldid xcbeautify
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1.6.0
@@ -62,13 +65,11 @@ jobs:
             ~/Library/Caches/org.swift.swiftpm
           key: ma-xcode-build-cache-${{ github.ref_name }}-
 
-      - name: Refresh prebuilt dependencies
-        run: bash ./SideStore/fetch-prebuilt.sh force
-
       - name: Build
         run: |
           mkdir -p build/logs
-          set -o pipefail && NSUnbufferedIO=YES make -B build \
+          set -o pipefail
+          NSUnbufferedIO=YES make -B build \
             2>&1 | tee build/logs/build.log | xcbeautify --renderer github-actions
 
       - name: Package IPA
@@ -103,13 +104,16 @@ jobs:
     name: Unit tests (DataStructures plan)
     runs-on: macos-26-intel
     continue-on-error: true
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           submodules: recursive
           fetch-depth: 1
 
-      - run: brew install ldid xcbeautify
+      - name: Install dependencies
+        run: brew install ldid xcbeautify
 
       - name: Setup Xcode
         uses: maxim-lobanov/setup-xcode@v1.6.0
@@ -117,13 +121,13 @@ jobs:
           xcode-version: "26.4"
 
       - name: Boot simulator
-        run: |
-          xcrun simctl boot "iPhone 17 Pro" || true
+        run: xcrun simctl boot "iPhone 17 Pro" || true
 
-      - name: Build for testing (DataStructures plan)
+      - name: Build for testing
         run: |
           mkdir -p build/logs
-          set -o pipefail && NSUnbufferedIO=YES xcodebuild build-for-testing \
+          set -o pipefail
+          NSUnbufferedIO=YES xcodebuild build-for-testing \
             -project AltStore.xcodeproj \
             -scheme SideStore \
             -testPlan DataStructureTests \
@@ -133,9 +137,10 @@ jobs:
             DEVELOPMENT_TEAM=XYZ0123456 ORG_IDENTIFIER=com.SideStore \
             2>&1 | tee build/logs/tests-build.log | xcbeautify --renderer github-actions
 
-      - name: Run unit tests (DataStructures plan)
+      - name: Run unit tests
         run: |
-          set -o pipefail && NSUnbufferedIO=YES xcodebuild test-without-building \
+          set -o pipefail
+          NSUnbufferedIO=YES xcodebuild test-without-building \
             -project AltStore.xcodeproj \
             -scheme SideStore \
             -testPlan DataStructureTests \
